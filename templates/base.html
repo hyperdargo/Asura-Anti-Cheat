@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Asura - Anti-Cheat Agent{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('image_file', filename='asura.png') }}" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      /* Layout: make footer stick to bottom using flex column */
+      html, body { height: 100%; }
+      body { display: flex; flex-direction: column; min-height: 100vh; }
+      .app-main { flex: 1 0 auto; }
+      footer.asura-footer { flex-shrink: 0; }
+
+      /* Theme variables + animated transitions */
+      :root{
+        /* Light-mode variables (default) */
+        --bg: #f8fafc; /* soft gray background */
+        --surface: #ffffff; /* card / surface */
+        --muted: #6c757d;
+        --text: #0f1723; /* rich charcoal for readable text */
+        --accent: #0d6efd;
+        --shadow: rgba(15,23,35,0.06);
+      }
+      body{ background: var(--bg); color: var(--text); transition: background-color .28s ease, color .22s ease; }
+
+      /* Dark mode variables */
+      body.dark-mode{
+        --bg: #000000;
+        --surface: #0b0b0b;
+        --muted: #9aa3ad;
+        --text: #e6e6e6;
+        --accent: #4fb3ff;
+      }
+
+      /* Apply surfaces and override common bootstrap classes for dark & light modes with transitions */
+      .navbar, .bg-light, .bg-white { background-color: var(--surface) !important; color: var(--text) !important; transition: background-color .28s ease, color .22s ease, box-shadow .22s; box-shadow: 0 2px 6px var(--shadow); }
+      .asura-footer, footer.asura-footer, .card, .list-group-item, .form-control, .dropdown-menu, .modal-content, .table { background-color: var(--surface); color: var(--text) !important; border-color: rgba(15,23,35,0.06); transition: background-color .28s ease, color .22s ease, border-color .22s ease, box-shadow .22s; }
+
+      /* Light-mode surfaces: subtle elevation */
+      .card { box-shadow: 0 10px 30px rgba(11,16,22,0.04); border-radius: 8px; }
+      .asura-footer { border-top: 1px solid rgba(15,23,35,0.04); }
+
+      /* Tables — make header and rows dark and readable */
+      .table thead th { background: rgba(15,23,35,0.02); color: var(--text) !important; }
+      .table tbody tr td, .table tbody tr th { background: transparent !important; color: var(--text) !important; }
+      .table, .table th, .table td { border-color: rgba(255,255,255,0.06) !important; }
+      .table-striped tbody tr:nth-of-type(odd) { background-color: rgba(15,23,35,0.01) !important; }
+
+      /* Alerts and buttons */
+      .alert { background-color: rgba(15,23,35,0.02); color: var(--text); border-color: rgba(15,23,35,0.035); }
+      .btn, .btn-outline-primary, .btn-outline-secondary, .btn-outline-success, .btn-outline-warning { color: var(--text); border-color: rgba(15,23,35,0.06); }
+
+      /* Links and code blocks */
+      a { color: var(--accent); transition: color .16s ease; }
+      pre, code { background: rgba(15,23,35,0.02); color: var(--text); }
+
+      /* Stronger dark-mode enforcement when body has dark-mode class */
+      body.dark-mode .navbar, body.dark-mode .asura-footer, body.dark-mode footer.asura-footer { background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.006)); }
+      body.dark-mode .card, body.dark-mode .list-group-item, body.dark-mode .form-control, body.dark-mode .dropdown-menu, body.dark-mode .modal-content { background: rgba(255,255,255,0.012) !important; }
+
+      /* ensure form controls are readable */
+      .form-control, .form-select { background-color: var(--surface); color: var(--text); border: 1px solid rgba(15,23,35,0.06); }
+      .form-control::placeholder { color: rgba(15,23,35,0.48); }
+
+      /* small helpers */
+      .text-muted, .small, .faint { color: rgba(15,23,35,0.64) !important; }
+      #theme-toggle { min-width: 42px; }
+
+      /* simple entrance animations */
+      .hero {
+        animation: heroFade 900ms ease both;
+      }
+      @keyframes heroFade {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .pulse {
+        animation: pulse 2.5s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+        100% { transform: scale(1); }
+      }
+      footer.asura-footer {
+        margin-top: 3rem; padding: 1.5rem 0; border-top: 1px solid rgba(0,0,0,0.06);
+      }
+      body.dark-mode footer.asura-footer { border-top-color: rgba(255,255,255,0.04); }
+
+      /* Brand slider styles */
+      .brand-slider {
+        position: fixed; left: 0; right: 0; top: 0; z-index: 1050;
+        transform: translateY(-110%); transition: transform 360ms cubic-bezier(.2,.9,.2,1);
+        background: linear-gradient(90deg, rgba(0,0,0,0.8), rgba(18,18,18,0.95)); color: #fff;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.25); backdrop-filter: blur(4px);
+      }
+      .brand-slider[aria-hidden="false"] { transform: translateY(0%); }
+      .brand-slider .brand-slider-inner { padding: 0.75rem 0; }
+
+      /* Hover & click micro-interactions */
+      a.nav-link { transition: color .16s ease, transform .12s ease; }
+      a.nav-link:hover { transform: translateY(-3px); color: #0d6efd !important; }
+      .navbar-brand { cursor: pointer; transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+      .navbar-brand:active { transform: scale(.98) rotate(-1deg); }
+      .asura-footer a { transition: color .18s ease, transform .12s ease; }
+      .asura-footer a:hover { transform: translateY(-2px); color: #0d6efd; }
+      button.btn { transition: transform .12s ease, box-shadow .12s ease; }
+      button.btn:active { transform: scale(.98); }
+
+      /* Card hover lift */
+      .card { transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s; }
+      .card:hover { transform: translateY(-6px); box-shadow: 0 8px 30px rgba(19,24,32,0.12); }
+
+      /* Scroll reveal */
+      .reveal { opacity: 0; transform: translateY(12px) scale(.995); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.8,.2,1); }
+      .reveal.in-view { opacity: 1; transform: translateY(0) scale(1); }
+
+      /* Subtle floating/pulse for CTAs */
+      .cta-float { animation: ctaFloat 4s ease-in-out infinite; }
+      @keyframes ctaFloat { 0%{ transform: translateY(0) } 50%{ transform: translateY(-4px) } 100%{ transform: translateY(0) } }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+      <div class="container-fluid">
+        <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+          <img src="{{ url_for('image_file', filename='asura.png') }}" alt="Asura" height="32" class="d-inline-block align-text-top me-2">
+          <span>Asura</span>
+        </a>
+        <button id="theme-toggle" class="btn btn-outline-secondary btn-sm me-2" aria-label="Toggle theme">🌙</button>
+        <button id="brand-slider-toggle" class="btn btn-outline-secondary btn-sm me-2" aria-label="Open site menu">ℹ️</button>
+        <div class="collapse navbar-collapse">
+          <ul class="navbar-nav ms-auto">
+            {% if current_user.is_authenticated %}
+              <li class="nav-item"><span class="nav-link">{{ current_user.username }} ({{ current_user.role }})</span></li>
+              {% if current_user.role == 'admin' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin</a></li>
+              {% endif %}
+              {% if current_user.role == 'lecturer' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher_exams') }}">Teacher</a></li>
+              {% endif %}
+              {% if current_user.role == 'student' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('student_exams') }}">Exams</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('student_results') }}">Results</a></li>
+              {% endif %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+            {% else %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Login</a></li>
+            {% endif %}
+              {% if current_user.role == 'staff' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher_exams') }}">Teacher</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_live_attempts') }}">Staff Live</a></li>
+              {% endif %}
+              {% if current_user.role == 'admin' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('teacher_exams') }}">Teacher</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_live_attempts') }}">Staff Live</a></li>
+              {% endif %}
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <main class="app-main container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, msg in messages %}
+            <div class="alert alert-{{ category }}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="asura-footer bg-light mt-4">
+      <div class="container d-flex justify-content-between align-items-center">
+        <div>
+          <strong>Asura</strong> — Exam integrity tools &dash; &copy; DTEmpire
+        </div>
+        <div class="text-end">
+          <a class="me-3" href="https://ankitgupta.com.np/" target="_blank" rel="noopener">About Me</a>
+          <a class="me-3" href="https://linktr.ee/dargotamber" target="_blank" rel="noopener">linktr.ee</a>
+          <span class="text-muted small">Built by DTEmpire</span>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Sliding header banner (hidden by default) -->
+    <div id="brand-slider" class="brand-slider" aria-hidden="true">
+      <div class="brand-slider-inner container">
+        <div class="d-flex justify-content-between align-items-center py-2">
+          <div>
+            <strong>Welcome to Asura</strong>
+            <div class="small text-muted">Quick links & site notes</div>
+          </div>
+          <div>
+            <button id="brand-slider-close" class="btn btn-sm btn-outline-light">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // Theme toggle using localStorage
+      (function(){
+        const KEY = 'asura_theme';
+        const btn = document.getElementById('theme-toggle');
+        function applyTheme(theme){
+          if(theme === 'dark'){
+            document.body.classList.add('dark-mode');
+            if(btn) btn.textContent = '☀️';
+          } else {
+            document.body.classList.remove('dark-mode');
+            if(btn) btn.textContent = '🌙';
+          }
+        }
+        // initialize from localStorage
+        try{
+          const saved = localStorage.getItem(KEY) || 'light';
+          applyTheme(saved);
+        }catch(e){ applyTheme('light'); }
+        if(btn){
+          btn.addEventListener('click', function(){
+            try{
+              const cur = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+              const next = cur === 'dark' ? 'light' : 'dark';
+              localStorage.setItem(KEY, next);
+              applyTheme(next);
+            }catch(e){ /* ignore */ }
+          });
+        }
+      })();
+        // Site-wide micro animations and interactions
+        (function(){
+            // Header slider toggle (separate button) — allow brand anchor to navigate home
+            const sliderToggle = document.getElementById('brand-slider-toggle');
+            const slider = document.getElementById('brand-slider');
+            const sliderClose = document.getElementById('brand-slider-close');
+            function openSlider(){ if(slider) slider.setAttribute('aria-hidden','false'); }
+            function closeSlider(){ if(slider) slider.setAttribute('aria-hidden','true'); }
+            if(sliderToggle && slider){
+              sliderToggle.addEventListener('click', function(e){
+                e.preventDefault();
+                if(slider.getAttribute('aria-hidden') === 'false') closeSlider(); else openSlider();
+              });
+            }
+            if(sliderClose) sliderClose.addEventListener('click', closeSlider);
+
+          // Ripple effect for clickable items
+          function ripple(e){
+            const el = e.currentTarget;
+            const rect = el.getBoundingClientRect();
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple';
+            const size = Math.max(rect.width, rect.height);
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = (e.clientX - rect.left - size/2) + 'px';
+            ripple.style.top = (e.clientY - rect.top - size/2) + 'px';
+            el.appendChild(ripple);
+            setTimeout(()=> ripple.remove(), 600);
+          }
+          document.querySelectorAll('button, .nav-link, .navbar-brand, .btn').forEach(it=>{
+            it.style.position = it.style.position || 'relative';
+            it.addEventListener('click', ripple);
+          });
+
+          // IntersectionObserver scroll reveal
+          const io = new IntersectionObserver((entries)=>{
+            entries.forEach(entry=>{
+              if(entry.isIntersecting){ entry.target.classList.add('in-view'); }
+            });
+          }, { threshold: 0.12 });
+          document.querySelectorAll('.reveal, .hero, .card, .asura-footer').forEach(el=> io.observe(el));
+        })();
+
+        // Minimal styles for ripple elements
+        (function(){
+          const style = document.createElement('style');
+          style.textContent = `
+            .ripple{ position:absolute; border-radius:50%; pointer-events:none; background: rgba(255,255,255,0.18); transform: scale(0); animation: rippleAnim .6s ease-out; }
+            @keyframes rippleAnim{ to { transform: scale(2.2); opacity: 0; } }
+          `;
+          document.head.appendChild(style);
+        })();
+    </script>
+  </body>
+</html>

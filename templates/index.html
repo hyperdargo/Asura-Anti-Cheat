@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Home - Asura{% endblock %}
+{% block content %}
+  <section class="hero p-5 rounded mb-4 text-center bg-light">
+    <div class="container">
+      <h1 class="display-5 fw-bold">Welcome to Asura</h1>
+      <p class="lead mb-4">Secure online examinations with client-side anti-cheat monitoring and live staff oversight.</p>
+      <div class="d-flex justify-content-center gap-3">
+        <a class="btn btn-primary btn-lg pulse" href="{{ url_for('student_exams') if current_user.role=='student' else url_for('teacher_exams') }}">Get Started</a>
+        <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('student_results') if current_user.role=='student' else url_for('teacher_exams') }}">Dashboard</a>
+      </div>
+    </div>
+  </section>
+
+  {% if role == 'admin' %}
+    <div class="mb-4">
+      <h3>Admin Dashboard</h3>
+      <p>Quick access to users:</p>
+      <div class="row">
+        <div class="col-md-6">
+          <h5>Students</h5>
+          <ul class="list-group">
+            {% for s in students %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">{{ s.username }} <span class="badge bg-secondary">{{ s.batch_id or '-' }}</span></li>
+            {% else %}
+              <li class="list-group-item">No students</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="col-md-6">
+          <h5>Lecturers</h5>
+          <ul class="list-group">
+            {% for l in lecturers %}
+              <li class="list-group-item">{{ l.username }}</li>
+            {% else %}
+              <li class="list-group-item">No lecturers</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  {% elif role == 'lecturer' %}
+    <div class="mb-4">
+      <h3>Instructor Dashboard</h3>
+      <p>Your active / upcoming exams:</p>
+      <table class="table">
+        <thead><tr><th>Title</th><th>Status</th><th>Window</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for info in exams %}
+            {% set e = info.exam %}
+            <tr>
+              <td>{{ e.title }}</td>
+              <td>
+                {% if info.status == 'not_started' %}<span class="badge bg-secondary">Not started</span>
+                {% elif info.status == 'started' %}<span class="badge bg-success">Started</span>
+                {% endif %}
+              </td>
+              <td>{% if info.started_at %}{{ info.started_at }} - {{ info.window_end }}{% else %}-{% endif %}</td>
+              <td>
+                {% if info.status == 'not_started' %}
+                  <form method="post" action="{{ url_for('start_exam_by_teacher', exam_id=e.id) }}" style="display:inline">
+                    <button class="btn btn-sm btn-success" type="submit">Start</button>
+                  </form>
+                {% else %}
+                  <a class="btn btn-sm btn-info" href="{{ url_for('teacher_exam_attempts', exam_id=e.id) }}">View Attempts</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No active or upcoming exams</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  {% elif role == 'student' %}
+    <div class="mb-4">
+      <h3>Student Dashboard</h3>
+      <p>Welcome, {{ current_user.username }} — please review the exam rules before starting.</p>
+      <ul>
+        {% for r in rules %}
+          <li>{{ r }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="mb-4">
+      <h4>Active Exams</h4>
+      <ul class="list-group">
+        {% for a in active_exams %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <strong>{{ a.exam.title }}</strong><br>
+              Starts: {{ a.started_at }} — Ends: {{ a.window_end }}
+            </div>
+            <div>
+              <form method="post" action="{{ url_for('start_exam', exam_id=a.exam.id) }}">
+                <button class="btn btn-sm btn-primary" type="submit">Start</button>
+              </form>
+            </div>
+          </li>
+        {% else %}
+          <li class="list-group-item">No active exams at this time.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+  {% else %}
+    <div class="mb-4">
+      <p>Use the navigation to access your dashboard.</p>
+    </div>
+  {% endif %}
+{% endblock %}

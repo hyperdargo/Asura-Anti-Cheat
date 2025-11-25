@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Manage Questions{% endblock %}
+{% block content %}
+  <h2>Manage Questions for: {{ exam.title }}</h2>
+  <p><a class="btn btn-secondary" href="{{ url_for('teacher_exams') }}">Back to Exams</a></p>
+
+  <h4>Existing Questions</h4>
+  {% for q in questions %}
+    <form method="post" class="mb-3">
+      <input type="hidden" name="op" value="edit">
+      <input type="hidden" name="question_id" value="{{ q.id }}">
+      <div class="mb-2">
+        <label class="form-label">Question text</label>
+        <textarea class="form-control" name="text">{{ q.text }}</textarea>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Choices (one per line)</label>
+        <textarea class="form-control" name="choices">{% for c in q.choices_list %}{{ c }}
+{% endfor %}</textarea>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Correct answer index (0-based)</label>
+        <input class="form-control" name="correct" value="{{ q.correct }}">
+      </div>
+      <button class="btn btn-primary btn-sm" type="submit">Save</button>
+      <button class="btn btn-danger btn-sm" name="op" value="delete" formmethod="post">Delete</button>
+    </form>
+  {% else %}
+    <p>No questions yet.</p>
+  {% endfor %}
+
+  <h4>Add New Question</h4>
+  <form method="post">
+    <input type="hidden" name="op" value="add">
+    <div class="mb-2">
+      <label class="form-label">Question text</label>
+      <textarea class="form-control" name="text"></textarea>
+    </div>
+    <div class="mb-2">
+      <label class="form-label">Choices (one per line)</label>
+      <textarea class="form-control" name="choices"></textarea>
+    </div>
+    <div class="mb-2">
+      <label class="form-label">Correct answer index (0-based)</label>
+      <input class="form-control" name="correct">
+    </div>
+    <button class="btn btn-success" type="submit">Add Question</button>
+  </form>
+{% endblock %}

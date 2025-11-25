@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Edit User - Anti-Cheat{% endblock %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <h2>Edit User: {{ user.username }}</h2>
+      <form method="post">
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input class="form-control" name="username" value="{{ user.username }}" readonly>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">New Password (leave blank to keep current)</label>
+          <input type="password" class="form-control" name="password">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          <select class="form-select" name="role" required>
+            <option value="student" {% if user.role=='student' %}selected{% endif %}>student</option>
+            <option value="lecturer" {% if user.role=='lecturer' %}selected{% endif %}>lecturer</option>
+            <option value="staff" {% if user.role=='staff' %}selected{% endif %}>staff</option>
+            <option value="admin" {% if user.role=='admin' %}selected{% endif %}>admin</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Batch (students only)</label>
+          <select class="form-select" name="batch_id">
+            <option value="">-- none --</option>
+            {% for b in batches %}
+              <option value="{{ b.id }}" {% if user.batch and user.batch.id==b.id %}selected{% endif %}>{{ b.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="btn btn-primary" type="submit">Save</button>
+        <a class="btn btn-secondary" href="{{ url_for('admin_dashboard') }}">Cancel</a>
+      </form>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Manage Batches{% endblock %}
+{% block content %}
+  <h2>Manage Batches</h2>
+  <form method="post" class="mb-3">
+    <div class="input-group">
+      <input class="form-control" name="name" placeholder="New batch name" required>
+      <button class="btn btn-primary" type="submit">Create</button>
+    </div>
+  </form>
+
+  <ul class="list-group">
+    {% for b in batches %}
+      <li class="list-group-item">{{ b.name }}</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

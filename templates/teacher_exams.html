@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}My Exams{% endblock %}
+{% block content %}
+  <h2>My Exams</h2>
+  {% if current_user.role in ['lecturer','admin'] %}
+    <p><a class="btn btn-success" href="{{ url_for('create_exam') }}">Create Exam</a></p>
+  {% endif %}
+  <table class="table">
+    <thead><tr><th>ID</th><th>Title</th><th>Batch</th><th>Status</th><th>Started</th><th>Duration (min)</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for info in exams %}
+        {% set e = info.exam %}
+        <tr>
+          <td>{{ e.id }}</td>
+          <td>{{ e.title }}</td>
+          <td>{{ e.batch_id }}</td>
+          <td>
+            {% if info.status == 'not_started' %}
+              <span class="badge bg-secondary">Not started</span>
+            {% elif info.status == 'started' %}
+              <span class="badge bg-success">Started</span>
+            {% else %}
+              <span class="badge bg-primary">Finished</span>
+            {% endif %}
+          </td>
+          <td>{% if info.started_at %}{{ info.started_at }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td>{{ e.duration_minutes }}</td>
+          <td>
+            <a class="btn btn-sm btn-primary" href="{{ url_for('add_question', exam_id=e.id) }}">Add Question</a>
+            <a class="btn btn-sm btn-secondary" href="{{ url_for('manage_questions', exam_id=e.id) }}">Manage Questions</a>
+            <a class="btn btn-sm btn-info" href="{{ url_for('teacher_exam_attempts', exam_id=e.id) }}">View Attempts</a>
+            {% if info.status == 'not_started' %}
+              <form method="post" action="{{ url_for('start_exam_by_teacher', exam_id=e.id) }}" style="display:inline">
+                <button class="btn btn-sm btn-success" type="submit">Start</button>
+              </form>
+            {% endif %}
+            {# Publish results control - only for lecturer/admin #}
+            {% if current_user.role in ['lecturer','admin'] %}
+              <form method="post" action="{{ url_for('publish_results', exam_id=e.id) }}" style="display:inline">
+                {% if e.results_published %}
+                  <input type="hidden" name="publish" value="0">
+                  <button class="btn btn-sm btn-warning" type="submit">Unpublish Results</button>
+                {% else %}
+                  <input type="hidden" name="publish" value="1">
+                  <button class="btn btn-sm btn-outline-success" type="submit">Publish Results</button>
+                {% endif %}
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}My Results{% endblock %}
+{% block content %}
+  <h2>My Results</h2>
+  {% if attempts %}
+    <table class="table table-sm table-striped">
+      <thead>
+        <tr><th>#</th><th>Exam</th><th>Started</th><th>Finished</th><th>Score</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for row in attempts %}
+          {% set a = row.attempt %}
+          {% set e = row.exam %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ e.title if e else ('Exam ' ~ a.exam_id) }}</td>
+            <td>{{ a.started_at }}</td>
+            <td>{{ a.finished_at or 'In progress' }}</td>
+            <td>
+              {% if e and e.results_published %}
+                {{ ('{:.2f}%'.format(a.score)) if a.score is not none else '-' }}
+              {% else %}
+                <em>Not published</em>
+              {% endif %}
+            </td>
+            <td>-</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No attempts found.</p>
+  {% endif %}
+{% endblock %}

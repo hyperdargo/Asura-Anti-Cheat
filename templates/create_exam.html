@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Create Exam{% endblock %}
+{% block content %}
+  <h2>Create Exam</h2>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">Title</label>
+      <input class="form-control" name="title" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Description</label>
+      <textarea class="form-control" name="description"></textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Batch</label>
+      <select class="form-select" name="batch_id" required>
+        {% for b in batches %}
+          <option value="{{ b.id }}">{{ b.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Duration (minutes)</label>
+      <input type="number" min="1" class="form-control" name="duration_minutes" placeholder="e.g. 30" required>
+      <div class="form-text">Students will get this many minutes from when they click Start. Lecturer will start the exam to allow students to begin.</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Create</button>
+  </form>
+{% endblock %}

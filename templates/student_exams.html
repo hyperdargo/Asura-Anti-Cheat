@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Available Exams{% endblock %}
+{% block content %}
+  <h2>Available Exams</h2>
+  <table class="table">
+    <thead><tr><th>Exam</th><th>Batch</th><th>Status</th><th>Window</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for info in exams %}
+        {% set e = info.exam %}
+        <tr>
+          <td>{{ e.title }}</td>
+          <td>{{ e.batch_id }}</td>
+          <td>
+            {% if info.status == 'not_started' %}
+              <span class="badge bg-secondary">Start Soon</span>
+            {% elif info.status == 'started' %}
+              <span class="badge bg-success">Started</span>
+            {% else %}
+              <span class="badge bg-primary">Finished</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if info.started_at %}
+              {{ info.started_at }} ({{ e.duration_minutes }} min)
+            {% else %}
+              <span class="text-muted">--</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if info.status == 'started' %}
+              {% if info.attempt_exists and not info.attempt_finished %}
+                <a class="btn btn-sm btn-primary" href="{{ url_for('take_exam', attempt_id=info.attempt_id) }}">Resume</a>
+              {% elif info.attempt_exists and info.attempt_finished %}
+                <span class="text-success">Submitted</span>
+              {% else %}
+                <form method="post" action="{{ url_for('start_exam', exam_id=e.id) }}" style="display:inline">
+                  <button class="btn btn-sm btn-success" type="submit">Start</button>
+                </form>
+              {% endif %}
+            {% elif info.status == 'not_started' %}
+              <span class="text-muted">Start Soon</span>
+            {% else %}
+              <span class="text-muted">Finished</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

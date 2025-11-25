@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Live Attempt Monitor{% endblock %}
+{% block content %}
+  <h2>Live Monitor — Attempt #{{ attempt.id }}</h2>
+  <p>Exam: <strong>{{ exam.title }}</strong> | Student ID: {{ attempt.user_id }} | Started: {{ attempt.started_at }} | Finished: {{ attempt.finished_at or 'In progress' }}</p>
+
+  <p>
+    <a class="btn btn-secondary" href="{{ url_for('view_attempt', attempt_id=attempt.id) }}">Back</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('view_attempt_events', attempt_id=attempt.id) }}">View Full Log</a>
+  </p>
+
+  <div id="live-log" style="max-height:60vh; overflow:auto; border:1px solid #ddd; padding:10px; background:#fafafa">
+    {% if records %}
+      {% for r in records %}
+        <div class="live-entry" data-ts="{{ r.ts }}">
+          <small class="text-muted">{{ r.ts }} —</small>
+          <strong> {{ r.event }}</strong>
+          <div><pre style="white-space:pre-wrap">{{ (r.data | tojson) if r.data is defined else '' }}</pre></div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-muted">No events recorded yet.</p>
+    {% endif %}
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    const attemptId = {{ attempt.id }};
+    const socket = io();
+
+    socket.on('connect', () => {
+      // request to join the attempt room
+      socket.emit('join_attempt', {attempt_id: attemptId});
+    });
+
+    socket.on('joined', (d)=>{
+      console.log('joined room', d);
+    });
+
+    socket.on('attempt_event', function(payload){
+      try{
+        if(!payload || payload.attempt_id != attemptId) return;
+        const r = payload.record;
+        const container = document.getElementById('live-log');
+        const div = document.createElement('div');
+        div.className = 'live-entry';
+        div.innerHTML = `<small class="text-muted">${r.ts} —</small> <strong> ${r.event}</strong><div><pre style="white-space:pre-wrap">${JSON.stringify(r.data||{}, null, 2)}</pre></div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+      }catch(e){ console.warn(e); }
+    });
+
+    socket.on('disconnect', ()=>{ console.log('socket disconnected'); });
+  </script>
+
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Add Question{% endblock %}
+{% block content %}
+  <h2>Add Question for {{ exam.title }}</h2>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">Question text</label>
+      <textarea class="form-control" name="text" required></textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Choices (one per line)</label>
+      <textarea class="form-control" name="choices" required></textarea>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Correct choice index (0-based)</label>
+      <input class="form-control" name="correct" required>
+    </div>
+    <button class="btn btn-primary" type="submit">Add</button>
+  </form>
+{% endblock %}

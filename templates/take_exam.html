@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% block title %}Take Exam{% endblock %}
+{% block content %}
+  <h2>{{ exam.title }}</h2>
+  <p>{{ exam.description }}</p>
+  <div id="timer" class="mb-3 alert alert-info"></div>
+  <div id="enter-fullscreen" class="mb-3 p-4 bg-warning rounded">
+    <h4>Enter Fullscreen to Begin</h4>
+    <p>For exam integrity, please enter fullscreen. The exam will start once you enter fullscreen. Exiting fullscreen will finalize and submit your attempt.</p>
+    <button id="begin-btn" class="btn btn-lg btn-primary">Enter Fullscreen &amp; Begin Exam</button>
+  </div>
+
+  <div class="mb-3 p-3 bg-light border rounded">
+    <h5>Optional: Native Monitoring Agent</h5>
+    <p>If you install the provided native monitoring agent on your Windows machine, it can report which application/window is active when you switch away from the exam. This requires you to run the agent locally and paste the token below into the agent so it can send reports for this attempt.</p>
+    <p><strong>Agent Token:</strong> <code id="agent-token">{{ attempt.agent_token or 'not-available' }}</code></p>
+    <p class="small text-muted">Note: The native agent is optional and must be installed/run by the student. Browsers cannot access other running applications for privacy reasons.</p>
+  </div>
+
+  <form method="post" id="exam-form" style="display:none">
+    {% for q in questions %}
+      <div class="mb-3">
+        <p><strong>Q{{ loop.index }}.</strong> {{ q.text }}</p>
+        {% for choice in q.choices %}
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="question_{{ q.id }}" id="q{{ q.id }}_{{ loop.index0 }}" value="{{ loop.index0 }}"
+              {% if saved_answers and (q.id|string) in saved_answers and saved_answers[q.id|string] is not none and saved_answers[q.id|string] == loop.index0 %}checked{% endif %}>
+            <label class="form-check-label" for="q{{ q.id }}_{{ loop.index0 }}">{{ choice }}</label>
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    <button class="btn btn-primary" type="submit">Submit Exam</button>
+  </form>
+
+  <script>
+    // show elapsed and remaining time; autosave and auto-submit
+    const deadlineMs = {{ deadline_ts if deadline_ts is not none else 'null' }};
+    const startedAtMs = {{ started_at_ms if started_at_ms is not none else 'null' }};
+    const lecturerStartedMs = {{ lecturer_started_ms if lecturer_started_ms is not none else 'null' }};
+
+    function formatTime(ms){
+      const total = Math.max(0, Math.floor(ms/1000));
+      const hrs = Math.floor(total/3600);
+      let rem = total % 3600;
+      const mins = Math.floor(rem/60);
+      const secs = rem % 60;
+      return `${hrs}h ${mins}m ${secs}s`;
+    }
+
+    function updateTimer(){
+      const now = Date.now();
+      let text = '';
+      if(lecturerStartedMs){
+        text += `Lecturer started: ${new Date(lecturerStartedMs).toLocaleString()}. `;
+      }
+      if(startedAtMs){
+        const elapsed = now - startedAtMs;
+        text += `You started: ${new Date(startedAtMs).toLocaleString()} (Elapsed: ${formatTime(elapsed)}). `;
+      }
+      if(deadlineMs){
+        const remaining = deadlineMs - now;
+        if(remaining <= 0){
+          text += 'Time left: 0s';
+          document.getElementById('timer').innerText = text;
+          // auto-submit form
+          const f = document.querySelector('form');
+          if(f){ f.submit(); }
+          return;
+        } else {
+          text += `Time left: ${formatTime(remaining)}`;
+        }
+      }
+      document.getElementById('timer').innerText = text;
+    }
+
+    // autosave answers every 30 seconds
+    async function autosave(){
+      const data = {};
+      {% for q in questions %}
+        {
+          const el = document.querySelector('input[name="question_{{ q.id }}"]:checked');
+          data['{{ q.id }}'] = el ? parseInt(el.value) : null;
+        }
+      {% endfor %}
+      try{
+        await fetch('{{ url_for('save_attempt', attempt_id=attempt.id) }}', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({answers: data})
+        });
+      }catch(e){
+        console.warn('Autosave failed', e);
+      }
+    }
+
+    // anti-cheat reporting
+    async function reportEvent(name, data){
+      try{
+        await fetch('{{ url_for('report_event', attempt_id=attempt.id) }}', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({event: name, data: data || {}})
+        });
+      }catch(e){ console.warn('report failed', e); }
+    }
+
+    // Fullscreen helper and enforcement: require user gesture to enter fullscreen
+    function tryEnterFullscreen(){
+      try{
+        if(document.documentElement.requestFullscreen){
+          return document.documentElement.requestFullscreen();
+        }
+      }catch(e){ return Promise.reject(e); }
+      return Promise.reject(new Error('Fullscreen not supported'));
+    }
+
+    let hadFullscreen = false;
+    document.addEventListener('fullscreenchange', function(){
+      const isFs = !!document.fullscreenElement;
+      if(hadFullscreen && !isFs){
+        // user exited fullscreen after starting -> immediate finish
+        reportEvent('fullscreen_exit', {});
+        fetch('{{ url_for('force_finish', attempt_id=attempt.id) }}', {method: 'POST'}).catch(()=>{});
+        setTimeout(()=>{ window.location.href = '{{ url_for('student_exams') }}'; }, 1000);
+      }
+      hadFullscreen = isFs;
+    });
+
+    // Detect visibility changes and window blur/focus
+    document.addEventListener('visibilitychange', function(){
+      if(document.hidden){ reportEvent('visibility_hidden', {}); }
+      else { reportEvent('visibility_visible', {}); }
+    });
+    window.addEventListener('blur', function(){ reportEvent('window_blur', {}); });
+    window.addEventListener('focus', function(){ reportEvent('window_focus', {}); });
+
+    // Prevent paste and record copy/paste events
+    document.addEventListener('copy', function(e){
+      try{ const sel = window.getSelection().toString(); reportEvent('copy', {text: sel}); }catch(e){}
+    });
+    document.addEventListener('paste', function(e){
+      try{
+        const clip = (e.clipboardData && e.clipboardData.getData) ? e.clipboardData.getData('text') : '';
+        reportEvent('paste', {text: clip});
+        // optionally prevent paste to block answers
+        e.preventDefault();
+      }catch(e){ }
+    });
+
+    // Detect DevTools open via heuristics (not fully reliable) and report
+    (function detectDevTools(){
+      let last = false;
+      setInterval(function(){
+        const widthDiff = window.outerWidth - window.innerWidth;
+        const heightDiff = window.outerHeight - window.innerHeight;
+        const open = widthDiff > 100 || heightDiff > 100;
+        if(open && !last){ reportEvent('devtools_open', {widthDiff, heightDiff}); }
+        last = open;
+      }, 1500);
+    })();
+
+    // Begin button: require user gesture to enter fullscreen then show exam
+    const beginBtn = document.getElementById('begin-btn');
+    const enterOverlay = document.getElementById('enter-fullscreen');
+    const examForm = document.getElementById('exam-form');
+    let timersStarted = false;
+
+    async function beginExam(){
+      // try fullscreen first
+      try{
+        await tryEnterFullscreen();
+        // mark that fullscreen was active at some point
+        hadFullscreen = !!document.fullscreenElement;
+      }catch(e){
+        // fullscreen unavailable or blocked; record and continue
+        reportEvent('fullscreen_unavailable', {error: (e && e.message) ? e.message : String(e)});
+      }
+
+      // reveal the exam form and hide overlay
+      if(enterOverlay) enterOverlay.style.display = 'none';
+      if(examForm) examForm.style.display = 'block';
+
+      // start timers and autosave once
+      if(!timersStarted){
+        updateTimer();
+        setInterval(updateTimer, 1000);
+        setInterval(autosave, 30000);
+        timersStarted = true;
+      }
+    }
+
+    if(beginBtn){
+      beginBtn.addEventListener('click', function(e){
+        e.preventDefault();
+        beginExam();
+      });
+    } else {
+      // no begin button - auto-begin (fallback)
+      beginExam();
+    }
+  </script>
+{% endblock %}

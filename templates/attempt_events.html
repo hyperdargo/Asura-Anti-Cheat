@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}Attempt Activity Log{% endblock %}
+{% block content %}
+  <h2>Activity Log for Attempt #{{ attempt.id }} ({{ attempt_user if attempt_user is defined else '' }})</h2>
+  <p>Exam: <strong>{{ exam.title }}</strong> | Student ID: {{ attempt.user_id }} | Started: {{ attempt.started_at }} | Finished: {{ attempt.finished_at or 'In progress' }}</p>
+
+  <p>
+    <a class="btn btn-secondary" href="{{ url_for('view_attempt', attempt_id=attempt.id) }}">Back to Attempt</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('view_attempt_events', attempt_id=attempt.id) }}?export=csv">Export CSV</a>
+  </p>
+
+  {% if records %}
+    <div class="table-responsive">
+      <table class="table table-sm table-striped">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Timestamp</th>
+            <th>Event</th>
+            <th>Details</th>
+            <th>IP</th>
+            <th>User-Agent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ r.ts }}</td>
+              <td>{{ r.event }}</td>
+              <td><pre style="white-space:pre-wrap">{{ (r.data | tojson) if r.data is defined else '' }}</pre></td>
+              <td>{{ r.ip }}</td>
+              <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.ua }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No recorded activity for this attempt.</p>
+  {% endif %}
+
+{% endblock %}

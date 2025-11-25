@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Exam Attempts{% endblock %}
+{% block content %}
+  <h2>Attempts for: {{ exam.title }}</h2>
+  <p><a class="btn btn-secondary" href="{{ url_for('teacher_exams') }}">Back to Exams</a></p>
+  <table class="table">
+    <thead><tr><th>Student</th><th>Started</th><th>Finished</th><th>Score</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for a in attempts %}
+        <tr>
+          <td>{{ a.user.username if a.user else a.user_id }}</td>
+          <td>{{ a.started_at }}</td>
+          <td>{{ a.finished_at or 'In progress' }}</td>
+          <td>{{ a.score if a.score is not none else '-' }}</td>
+          <td><a class="btn btn-sm btn-primary" href="{{ url_for('view_attempt', attempt_id=a.id) }}">View</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
