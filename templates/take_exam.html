@@ -1,6 +1,40 @@
 {% extends 'base.html' %}
 {% block title %}Take Exam{% endblock %}
 {% block content %}
+  <style>
+    /* Disable text selection and copying */
+    body {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    /* Allow selection in agent section */
+    .agent-section {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
+    /* Screenshot prevention overlay */
+    .screenshot-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: white;
+      z-index: 9999;
+      display: none;
+      opacity: 0;
+      transition: none;
+    }
+    .screenshot-overlay.active {
+      opacity: 1;
+    }
+  </style>
+  <!-- Screenshot prevention overlay -->
+  <div id="screenshotOverlay" class="screenshot-overlay"></div>
   <h2>{{ exam.title }}</h2>
   <p>{{ exam.description }}</p>
   <div id="timer" class="mb-3 alert alert-info"></div>
@@ -10,11 +44,13 @@
     <button id="begin-btn" class="btn btn-lg btn-primary">Enter Fullscreen &amp; Begin Exam</button>
   </div>
 
-  <div class="mb-3 p-3 bg-light border rounded">
+  <div class="mb-3 p-3 bg-light border rounded agent-section">
     <h5>Optional: Native Monitoring Agent</h5>
     <p>If you install the provided native monitoring agent on your Windows machine, it can report which application/window is active when you switch away from the exam. This requires you to run the agent locally and paste the token below into the agent so it can send reports for this attempt.</p>
+    <p><strong>Attempt ID:</strong> <code>{{ attempt.id }}</code></p>
     <p><strong>Agent Token:</strong> <code id="agent-token">{{ attempt.agent_token or 'not-available' }}</code></p>
-    <p class="small text-muted">Note: The native agent is optional and must be installed/run by the student. Browsers cannot access other running applications for privacy reasons.</p>
+    <p><a href="{{ url_for('static', filename='exam_proctor_extension.zip') }}" download>Download Browser Extension</a> (Recommended for enhanced security)</p>
+    <p class="small text-muted">Instructions: Download the extension, unzip, go to Chrome Extensions (chrome://extensions/), enable Developer Mode, load unpacked, and select the folder. The extension will automatically close other tabs and provide token copying.</p>
   </div>
 
   <form method="post" id="exam-form" style="display:none">
@@ -127,15 +163,19 @@
 
     // Detect visibility changes and window blur/focus
     document.addEventListener('visibilitychange', function(){
-      if(document.hidden){ reportEvent('visibility_hidden', {}); }
-      else { reportEvent('visibility_visible', {}); }
+      if(document.hidden){ reportEvent('exam_portal_hidden', {}); }
+      else { reportEvent('exam_portal_visible', {}); }
     });
-    window.addEventListener('blur', function(){ reportEvent('window_blur', {}); });
-    window.addEventListener('focus', function(){ reportEvent('window_focus', {}); });
+    window.addEventListener('blur', function(){ reportEvent('exam_portal_blur', {}); });
+    window.addEventListener('focus', function(){ reportEvent('exam_portal_focus', {}); });
 
     // Prevent paste and record copy/paste events
     document.addEventListener('copy', function(e){
-      try{ const sel = window.getSelection().toString(); reportEvent('copy', {text: sel}); }catch(e){}
+      // Allow copying in agent section
+      if(!e.target.closest('.agent-section')){
+        try{ const sel = window.getSelection().toString(); reportEvent('copy', {text: sel}); }catch(e){}
+        e.preventDefault(); // Prevent copying outside agent section
+      }
     });
     document.addEventListener('paste', function(e){
       try{
@@ -146,17 +186,107 @@
       }catch(e){ }
     });
 
-    // Detect DevTools open via heuristics (not fully reliable) and report
-    (function detectDevTools(){
-      let last = false;
-      setInterval(function(){
-        const widthDiff = window.outerWidth - window.innerWidth;
-        const heightDiff = window.outerHeight - window.innerHeight;
-        const open = widthDiff > 100 || heightDiff > 100;
-        if(open && !last){ reportEvent('devtools_open', {widthDiff, heightDiff}); }
-        last = open;
-      }, 1500);
+    // Prevent right-click context menu
+    document.addEventListener('contextmenu', function(e){
+      e.preventDefault();
+      reportEvent('right_click', {});
+    });
+
+    // Prevent cut
+    document.addEventListener('cut', function(e){
+      e.preventDefault();
+      reportEvent('cut', {});
+    });
+
+    // Comprehensive keyboard blocking
+    function blockRestrictedKeys(e){
+      const key = (e.key || '').toLowerCase();
+      const code = e.keyCode;
+      const combo = {ctrl:e.ctrlKey, shift:e.shiftKey, alt:e.altKey, meta:e.metaKey};
+      const shouldBlock =
+        (combo.alt && code === 115) ||          // Alt+F4
+        (combo.alt && code === 9)  ||           // Alt+Tab
+        (code === 91 || code === 92 || key === 'meta') || // Win key
+        (combo.ctrl && combo.alt && code === 46) ||       // Ctrl+Alt+Del
+        (combo.ctrl && combo.shift && code === 27) ||     // Ctrl+Shift+Esc
+        (code === 123) ||                                 // F12
+        (combo.ctrl && combo.shift && code === 73) ||     // Ctrl+Shift+I
+        (combo.ctrl && combo.shift && code === 67) ||     // Ctrl+Shift+C
+        (key === 'printscreen' || code === 44) ||         // PrintScreen
+        (combo.ctrl && key === 's') ||                    // Ctrl+S
+        (combo.ctrl && key === 'p');                      // Ctrl+P
+      if(shouldBlock){
+        e.preventDefault();
+        e.stopPropagation();
+        if(e.stopImmediatePropagation){ e.stopImmediatePropagation(); }
+        reportEvent('exam_portal_shortcut_blocked', {key, code, combo});
+        if(key === 'printscreen' || code === 44){ showScreenshotOverlay(); }
+        return false;
+      }
+    }
+
+    window.addEventListener('keydown', blockRestrictedKeys, true);
+    document.addEventListener('keydown', blockRestrictedKeys, true);
+
+    // Function to show screenshot overlay
+    function showScreenshotOverlay(){
+      const overlay = document.getElementById('screenshotOverlay');
+      overlay.classList.add('active');
+      overlay.style.display = 'block';
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          overlay.style.display = 'none';
+        }, 200);
+      }, 800);
+    }
+
+    // Enhanced screenshot detection with multiple methods
+    (function detectScreenCapture(){
+      let checkInterval = setInterval(() => {
+        if(document.hidden) return;
+        
+        try{
+          // Method 1: Canvas fingerprinting
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 100;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#FF0000';
+          ctx.fillRect(0, 0, 100, 100);
+          
+          const imageData = ctx.getImageData(0, 0, 100, 100);
+          const data = imageData.data;
+          
+          // Check if canvas was rendered
+          let colored = false;
+          for(let i = 0; i < data.length; i += 4){
+            if(data[i] > 200){ colored = true; break; }
+          }
+          
+          if(!colored){
+            reportEvent('exam_portal_screenshot_possible', {});
+            showScreenshotOverlay();
+          }
+        }catch(e){ }
+      }, 1000);
     })();
+
+    // Prevent window from being minimized or closed
+    window.addEventListener('beforeunload', function(e){
+      reportEvent('window_unload_attempt', {});
+      e.preventDefault();
+      e.returnValue = '';
+      return false;
+    });
+
+    // Block fullscreen exit by preventing Escape key
+    document.addEventListener('keydown', function(e){
+      if(e.keyCode === 27 && document.fullscreenElement){
+        e.preventDefault();
+        reportEvent('fullscreen_escape_attempt', {});
+        return false;
+      }
+    }, true);
 
     // Begin button: require user gesture to enter fullscreen then show exam
     const beginBtn = document.getElementById('begin-btn');
@@ -197,5 +327,7 @@
       // no begin button - auto-begin (fallback)
       beginExam();
     }
+
+    // Removed auto-begin in popup to ensure user gesture for fullscreen
   </script>
 {% endblock %}

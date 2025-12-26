@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Exam Proctor</title>
+  <style>
+    body { width: 300px; padding: 10px; }
+    .token { background: #f0f0f0; padding: 5px; margin: 5px 0; word-break: break-all; }
+    button { width: 100%; margin: 5px 0; }
+  </style>
+</head>
+<body>
+  <h3>Exam Proctor</h3>
+  <div id="tokenDisplay">
+    <p>Attempt ID: <span id="attemptId">Not available</span></p>
+    <p>Token: <div class="token" id="token">Not available</div></p>
+    <button id="copyToken">Copy Token</button>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

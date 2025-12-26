@@ -1090,6 +1090,14 @@ def take_exam(attempt_id):
     except Exception:
         lecturer_started_ms = None
 
+    # Ensure agent_token is set for the attempt
+    if not attempt.agent_token:
+        try:
+            attempt.agent_token = secrets.token_urlsafe(18)
+            db.session.commit()
+        except Exception:
+            attempt.agent_token = None
+
     return render_template('take_exam.html', exam=exam, attempt=attempt, questions=questions, deadline=deadline, deadline_ts=deadline_ts, saved_answers=saved_answers, started_at_ms=started_at_ms, lecturer_started_ms=lecturer_started_ms)
 
 
