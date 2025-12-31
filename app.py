@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -131,6 +131,10 @@ class ExamAttempt(db.Model):
     events = db.Column(db.Text, nullable=True)  # JSON list of event records (anti-cheat logs)
     score = db.Column(db.Float, nullable=True)
     agent_token = db.Column(db.String(200), nullable=True)  # short-lived token for native agent reporting
+    
+    # Relationships
+    exam = db.relationship('Exam', backref='attempts', foreign_keys=[exam_id])
+    user = db.relationship('User', backref='attempts', foreign_keys=[user_id])
 
 
 
@@ -968,7 +972,18 @@ def student_results():
             exam = Exam.query.get(a.exam_id)
         except Exception:
             exam = None
-        enriched.append({'attempt': a, 'exam': exam})
+        # Check if exam was terminated
+        is_terminated = False
+        if a.events:
+            try:
+                events_data = json.loads(a.events)
+                for event in events_data:
+                    if 'exam_terminated_by_staff' in event.get('event', ''):
+                        is_terminated = True
+                        break
+            except Exception:
+                pass
+        enriched.append({'attempt': a, 'exam': exam, 'is_terminated': is_terminated})
     return render_template('student_results.html', attempts=enriched)
 
 
@@ -1241,6 +1256,261 @@ def agent_report_event():
         logger.exception('emit failed')
 
     return {'status': 'ok'}
+
+
+def load_attempt_records(attempt_id):
+    """Load all activity records for an attempt"""
+    attempt = ExamAttempt.query.get_or_404(attempt_id)
+    
+    # Load records from the database (stored in attempt.events as JSON)
+    records = []
+    try:
+        if attempt.events:
+            records = json.loads(attempt.events)
+    except Exception:
+        records = []
+    
+    return records
+
+@app.route('/exam/<int:exam_id>/ai-alerts')
+@login_required
+def exam_ai_alerts(exam_id):
+    if current_user.role not in ['lecturer', 'admin', 'staff']:
+        abort(403)
+    
+    exam = Exam.query.get_or_404(exam_id)
+    
+    # Get all attempts for this exam
+    attempts = ExamAttempt.query.filter_by(exam_id=exam_id).all()
+    
+    alerts = []
+    for attempt in attempts:
+        # Analyze logs for suspicious activity
+        analysis = analyze_attempt_logs(attempt.id)
+        if analysis['is_suspicious']:
+            alerts.append({
+                'id': attempt.id,
+                'attempt_id': attempt.id,
+                'student_id': attempt.user_id,
+                'student_name': attempt.user.username if attempt.user else f"User {attempt.user_id}",
+                'severity': analysis['severity'],
+                'violation_type': analysis['violation_type'],
+                'description': analysis['description'],
+                'activities': analysis['activities'],
+                'timestamp': attempt.started_at,
+                'reviewed': False,
+                'notes': None
+            })
+    
+    # Sort by severity
+    severity_order = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3}
+    alerts.sort(key=lambda x: severity_order.get(x['severity'], 4))
+    
+    # Calculate statistics
+    stats = {
+        'critical': sum(1 for a in alerts if a['severity'] == 'CRITICAL'),
+        'high': sum(1 for a in alerts if a['severity'] == 'HIGH'),
+        'medium': sum(1 for a in alerts if a['severity'] == 'MEDIUM'),
+        'total_students': len(attempts)
+    }
+    
+    return render_template('exam_ai_alerts.html', 
+                         exam=exam, 
+                         alerts=alerts, 
+                         stats=stats)
+
+def analyze_attempt_logs(attempt_id):
+    """AI-based analysis of exam attempt logs"""
+    records = load_attempt_records(attempt_id)
+    
+    # Count violations
+    violations = {
+        'fullscreen_exit': 0,
+        'window_blur': 0,
+        'window_hidden': 0,
+        'shortcut_blocked': 0,
+        'tab_switch': 0
+    }
+    
+    activities = []
+    
+    for record in records:
+        event = record.get('event', '').lower()
+        data = record.get('data', {})
+        
+        # Check for fullscreen exit
+        if 'fullscreen' in event and ('exit' in event or 'change' in event):
+            violations['fullscreen_exit'] += 1
+        # Check for window blur (tab switching)
+        if 'blur' in event:
+            violations['window_blur'] += 1
+        # Check for window hidden (tab switching/minimizing)
+        if 'hidden' in event:
+            violations['window_hidden'] += 1
+        # Check for shortcut blocked (screenshot attempts, Windows key, cheating shortcuts)
+        if 'shortcut' in event and 'blocked' in event:
+            violations['shortcut_blocked'] += 1
+    
+    # Detect tab switching patterns (blur followed by focus)
+    for i in range(len(records) - 1):
+        curr_event = records[i].get('event', '').lower()
+        next_event = records[i+1].get('event', '').lower()
+        if 'blur' in curr_event and 'focus' in next_event:
+            violations['tab_switch'] += 1
+    
+    # Determine severity and create description
+    is_suspicious = False
+    severity = 'LOW'
+    violation_type = 'Normal Activity'
+    description = 'No suspicious activity detected.'
+    
+    # Critical violations - Fullscreen exits
+    if violations['fullscreen_exit'] >= 1:
+        is_suspicious = True
+        severity = 'CRITICAL'
+        violation_type = '🚫 Fullscreen Exit Detected'
+        description = f'Student exited fullscreen mode {violations["fullscreen_exit"]} time(s), indicating possible exam window closure or switching to other applications.'
+        activities.append({
+            'event': 'FULLSCREEN_EXIT',
+            'description': 'Pressed ESC or exited exam window',
+            'count': violations['fullscreen_exit'],
+            'badge_color': 'danger'
+        })
+    
+    # High risk violations - Screenshot/cheating shortcuts
+    if violations['shortcut_blocked'] >= 1:
+        is_suspicious = True
+        if severity != 'CRITICAL':
+            severity = 'HIGH'
+        violation_type = '📸 Screenshot/Cheating Shortcuts Detected'
+        description = f'Attempted to use screenshot or cheating shortcuts {violations["shortcut_blocked"]} time(s) (Windows key, Print Screen, Win+Shift+S, etc.).'
+        activities.append({
+            'event': 'SCREENSHOT_ATTEMPT',
+            'description': 'Tried to capture screen or use cheating shortcuts',
+            'count': violations['shortcut_blocked'],
+            'badge_color': 'warning'
+        })
+    
+    # Medium-High risk - Tab switching
+    if violations['tab_switch'] >= 3:
+        is_suspicious = True
+        if severity not in ['CRITICAL', 'HIGH']:
+            severity = 'MEDIUM'
+        violation_type = '🔄 Tab Switching Detected'
+        description = f'Switched between windows/tabs {violations["tab_switch"]} times using Alt+Tab or similar actions.'
+        activities.append({
+            'event': 'TAB_SWITCH',
+            'description': 'Switched to other windows/applications',
+            'count': violations['tab_switch'],
+            'badge_color': 'info'
+        })
+    
+    # Medium risk - Window blur (losing focus)
+    if violations['window_blur'] >= 5:
+        is_suspicious = True
+        if severity not in ['CRITICAL', 'HIGH']:
+            severity = 'MEDIUM'
+        activities.append({
+            'event': 'WINDOW_BLUR',
+            'description': 'Lost focus on exam window (switched tabs)',
+            'count': violations['window_blur'],
+            'badge_color': 'secondary'
+        })
+    
+    # Medium risk - Window hidden
+    if violations['window_hidden'] >= 3:
+        is_suspicious = True
+        if severity not in ['CRITICAL', 'HIGH']:
+            severity = 'MEDIUM'
+        activities.append({
+            'event': 'WINDOW_HIDDEN',
+            'description': 'Exam window was hidden/minimized (switched tabs)',
+            'count': violations['window_hidden'],
+            'badge_color': 'warning'
+        })
+    
+    return {
+        'is_suspicious': is_suspicious,
+        'severity': severity,
+        'violation_type': violation_type,
+        'description': description,
+        'activities': activities,
+        'violations': violations
+    }
+
+@app.route('/api/alerts/<int:alert_id>/review', methods=['POST'])
+@login_required
+def review_alert(alert_id):
+    if current_user.role not in ['lecturer', 'admin', 'staff']:
+        abort(403)
+    
+    data = request.get_json()
+    # Here you would save the review status to database
+    # For now, just return success
+    return jsonify({'success': True, 'message': 'Alert reviewed'})
+
+
+@app.route('/teacher/attempt/<int:attempt_id>/terminate', methods=['POST'])
+@login_required
+def terminate_attempt(attempt_id):
+    """Terminate/force-finish a student's exam attempt (for cheating/violations)"""
+    attempt = ExamAttempt.query.get_or_404(attempt_id)
+    exam = Exam.query.get_or_404(attempt.exam_id)
+    
+    # Authorization: lecturer (owner), staff, or admin can terminate
+    role = getattr(current_user, 'role', None)
+    if role == 'lecturer':
+        if exam.creator_id != current_user.id and current_user.role != 'admin':
+            flash('Not authorized', 'danger')
+            return redirect(url_for('teacher_exams'))
+    elif role not in ('staff', 'admin'):
+        flash('Not authorized', 'danger')
+        return redirect(url_for('index'))
+    
+    # Check if already finished
+    if attempt.finished_at:
+        flash('Attempt is already finished', 'info')
+        return redirect(request.referrer or url_for('teacher_exams'))
+    
+    # Force finalize the attempt with 0 score
+    attempt.finished_at = datetime.now()
+    attempt.score = 0.0  # Set score to 0 for terminated exams
+    db.session.commit()
+    
+    # Log the termination event
+    rec = {
+        'ts': datetime.now().isoformat(),
+        'event': 'exam_terminated_by_staff',
+        'data': {
+            'terminated_by': current_user.username,
+            'terminated_by_role': current_user.role,
+            'reason': 'Suspicious activity detected'
+        },
+        'ip': request.remote_addr,
+        'ua': request.headers.get('User-Agent'),
+        'source': 'system'
+    }
+    
+    try:
+        existing = json.loads(attempt.events) if attempt.events else []
+    except Exception:
+        existing = []
+    existing.append(rec)
+    attempt.events = json.dumps(existing)
+    db.session.commit()
+    
+    # Emit socket event to notify the student (if connected)
+    try:
+        room = f'attempt_{attempt.id}'
+        socketio.emit('exam_terminated', {
+            'attempt_id': attempt.id,
+            'message': 'Your exam has been terminated due to suspicious activity.'
+        }, room=room)
+    except Exception:
+        logger.exception('Failed to emit termination event')
+    
+    flash(f'Exam attempt terminated for student. Student will be notified.', 'success')
+    return redirect(request.referrer or url_for('exam_ai_alerts', exam_id=exam.id))
 
 
 if __name__ == '__main__':

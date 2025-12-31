@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Staff Dashboard</h1>
+            <nav>
+                <ul class="tabs">
+                    <!-- ...existing tabs... -->
+                    <li><a href="#" onclick="showTab('alerts'); return false;">🚨 Alerts</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <!-- ...existing tab content... -->
+
+            <!-- Add this as a new tab content section -->
+            <div id="alerts-tab" class="tab-content" style="display: none;">
+                <iframe src="alerts.html" style="width: 100%; height: calc(100vh - 150px); border: none;"></iframe>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

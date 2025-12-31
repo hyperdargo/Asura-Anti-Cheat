@@ -1,0 +1,192 @@
+<!-- filepath: s:\Semester 6\ST6047CEM Cyber Security Project\CODE\templates\exam_ai_alerts.html -->
+{% extends 'base.html' %}
+{% block title %}AI Alerts - {{ exam.title }}{% endblock %}
+{% block content %}
+  <h2>🚨 AI-Detected Suspicious Activity</h2>
+  <h4>Exam: {{ exam.title }}</h4>
+  <p>
+    <a class="btn btn-secondary" href="{{ url_for('teacher_exams') }}">Back to Exams</a>
+    <a class="btn btn-info" href="{{ url_for('teacher_exam_attempts', exam_id=exam.id) }}">View All Attempts</a>
+  </p>
+
+  <div class="alert-summary mb-4">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="card text-center border-danger">
+          <div class="card-body">
+            <h5 class="card-title text-danger">{{ stats.critical }}</h5>
+            <p class="card-text">Critical Alerts</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card text-center border-warning">
+          <div class="card-body">
+            <h5 class="card-title text-warning">{{ stats.high }}</h5>
+            <p class="card-text">High Risk</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card text-center border-info">
+          <div class="card-body">
+            <h5 class="card-title text-info">{{ stats.medium }}</h5>
+            <p class="card-text">Medium Risk</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card text-center border-secondary">
+          <div class="card-body">
+            <h5 class="card-title">{{ stats.total_students }}</h5>
+            <p class="card-text">Students Monitored</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label>Filter by Severity:</label>
+    <select class="form-select" id="severityFilter" onchange="filterAlerts()">
+      <option value="all">All Severities</option>
+      <option value="CRITICAL">Critical Only</option>
+      <option value="HIGH">High Risk</option>
+      <option value="MEDIUM">Medium Risk</option>
+    </select>
+  </div>
+
+  {% if alerts %}
+    <div id="alertsContainer">
+      {% for alert in alerts %}
+        <div class="card mb-3 alert-card" data-severity="{{ alert.severity }}">
+          <div class="card-header d-flex justify-content-between align-items-center
+            {% if alert.severity == 'CRITICAL' %}bg-danger text-white
+            {% elif alert.severity == 'HIGH' %}bg-warning
+            {% elif alert.severity == 'MEDIUM' %}bg-info text-white
+            {% else %}bg-secondary text-white{% endif %}">
+            <div>
+              <strong>{{ alert.student_name }}</strong> (ID: {{ alert.student_id }})
+              <span class="badge bg-dark ms-2">{{ alert.severity }}</span>
+            </div>
+            <small>{{ alert.timestamp }}</small>
+          </div>
+          <div class="card-body">
+            <h5 class="card-title">{{ alert.violation_type }}</h5>
+            <p class="card-text">{{ alert.description }}</p>
+            
+            <div class="violation-details">
+              <strong>Detected Activities:</strong>
+              <ul class="mb-2">
+                {% for activity in alert.activities %}
+                  <li>
+                    <span class="badge bg-{{ activity.badge_color }} me-2">{{ activity.event }}</span>
+                    {{ activity.description }}
+                    <small class="text-muted">({{ activity.count }} times)</small>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+
+            <div class="alert-actions mt-3">
+              <a href="{{ url_for('view_attempt_events', attempt_id=alert.attempt_id) }}" 
+                 class="btn btn-sm btn-primary">View Full Log</a>
+              <a href="{{ url_for('live_attempt_events', attempt_id=alert.attempt_id) }}" 
+                 class="btn btn-sm btn-warning">Live Monitor</a>
+              <button class="btn btn-sm btn-success" onclick="markAsReviewed({{ alert.id }})">Mark Reviewed</button>
+              <button class="btn btn-sm btn-secondary" onclick="markAsFalsePositive({{ alert.id }})">False Positive</button>
+              <button class="btn btn-sm btn-danger" onclick="terminateExam({{ alert.attempt_id }}, '{{ alert.student_name }}')">
+                🚫 Terminate Exam
+              </button>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-success">
+      <h4>✅ No suspicious activity detected</h4>
+      <p>All students appear to be following exam protocols.</p>
+    </div>
+  {% endif %}
+
+  <style>
+    .alert-card {
+      transition: transform 0.2s;
+    }
+    .alert-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .violation-details {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    .violation-details ul {
+      margin-bottom: 0;
+    }
+  </style>
+
+  <script>
+    function filterAlerts() {
+      const severity = document.getElementById('severityFilter').value;
+      const cards = document.querySelectorAll('.alert-card');
+      
+      cards.forEach(card => {
+        if (severity === 'all' || card.dataset.severity === severity) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    function markAsReviewed(alertId) {
+      const notes = prompt('Enter review notes (optional):');
+      if (notes !== null) {
+        fetch(`/api/alerts/${alertId}/review`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({status: 'reviewed', notes: notes})
+        }).then(response => response.json())
+        .then(data => {
+          alert(data.message || 'Alert marked as reviewed');
+          location.reload();
+        }).catch(err => {
+          console.error(err);
+          alert('Error updating alert');
+        });
+      }
+    }
+
+    function markAsFalsePositive(alertId) {
+      if (confirm('Mark this alert as a false positive?')) {
+        fetch(`/api/alerts/${alertId}/review`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({status: 'false_positive'})
+        }).then(response => response.json())
+        .then(data => {
+          alert(data.message || 'Alert marked as false positive');
+          location.reload();
+        }).catch(err => {
+          console.error(err);
+          alert('Error updating alert');
+        });
+      }
+    }
+
+    function terminateExam(attemptId, studentName) {
+      if (confirm(`⚠️ TERMINATE EXAM for ${studentName}?\n\nThis will immediately end their exam due to cheating/violations. This action cannot be undone.`)) {
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/teacher/attempt/${attemptId}/terminate`;
+        document.body.appendChild(form);
+        form.submit();
+      }
+    }
+  </script>
+{% endblock %}

@@ -6,120 +6,498 @@
     <title>{% block title %}Asura - Anti-Cheat Agent{% endblock %}</title>
     <link rel="icon" href="{{ url_for('image_file', filename='asura.png') }}" type="image/png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Socket.IO Client for real-time features -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js" crossorigin="anonymous"></script>
     <style>
-      /* Layout: make footer stick to bottom using flex column */
-      html, body { height: 100%; }
-      body { display: flex; flex-direction: column; min-height: 100vh; }
-      .app-main { flex: 1 0 auto; }
+      /* Professional Exam Portal Theme */
+      @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+      
+      * { box-sizing: border-box; }
+      html, body { 
+        height: 100%; 
+        margin: 0; 
+        padding: 0; 
+        font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+      }
+      body { 
+        display: flex; 
+        flex-direction: column; 
+        min-height: 100vh;
+        background: linear-gradient(180deg, #1a237e 0%, #283593 50%, #3949ab 100%);
+        background-attachment: fixed;
+        color: #ffffff;
+      }
+      .app-main { flex: 1 0 auto; padding: 2rem 0; }
       footer.asura-footer { flex-shrink: 0; }
 
-      /* Theme variables + animated transitions */
-      :root{
-        /* Light-mode variables (default) */
-        --bg: #f8fafc; /* soft gray background */
-        --surface: #ffffff; /* card / surface */
-        --muted: #6c757d;
-        --text: #0f1723; /* rich charcoal for readable text */
-        --accent: #0d6efd;
-        --shadow: rgba(15,23,35,0.06);
+      /* Professional Color Palette for Exam Portal */
+      :root {
+        --primary-blue: #1e3a8a;
+        --primary-blue-dark: #1e40af;
+        --secondary-blue: #3b82f6;
+        --accent-teal: #0891b2;
+        --success: #059669;
+        --warning: #d97706;
+        --danger: #dc2626;
+        --info: #0284c7;
+        
+        --surface: #ffffff;
+        --surface-hover: #f8fafc;
+        --text-primary: #ffffff;
+        --text-secondary: #e2e8f0;
+        --border: #cbd5e1;
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+        --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+        --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+        --shadow-xl: 0 20px 25px rgba(0,0,0,0.12);
       }
-      body{ background: var(--bg); color: var(--text); transition: background-color .28s ease, color .22s ease; }
 
-      /* Dark mode variables */
-      body.dark-mode{
-        --bg: #000000;
-        --surface: #0b0b0b;
-        --muted: #9aa3ad;
-        --text: #e6e6e6;
-        --accent: #4fb3ff;
+      /* Top Security Banner */
+      .navbar {
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+        box-shadow: 0 4px 20px rgba(30, 58, 138, 0.3);
+        padding: 1rem 0;
+        border-bottom: 3px solid #3b82f6;
       }
 
-      /* Apply surfaces and override common bootstrap classes for dark & light modes with transitions */
-      .navbar, .bg-light, .bg-white { background-color: var(--surface) !important; color: var(--text) !important; transition: background-color .28s ease, color .22s ease, box-shadow .22s; box-shadow: 0 2px 6px var(--shadow); }
-      .asura-footer, footer.asura-footer, .card, .list-group-item, .form-control, .dropdown-menu, .modal-content, .table { background-color: var(--surface); color: var(--text) !important; border-color: rgba(15,23,35,0.06); transition: background-color .28s ease, color .22s ease, border-color .22s ease, box-shadow .22s; }
-
-      /* Light-mode surfaces: subtle elevation */
-      .card { box-shadow: 0 10px 30px rgba(11,16,22,0.04); border-radius: 8px; }
-      .asura-footer { border-top: 1px solid rgba(15,23,35,0.04); }
-
-      /* Tables — make header and rows dark and readable */
-      .table thead th { background: rgba(15,23,35,0.02); color: var(--text) !important; }
-      .table tbody tr td, .table tbody tr th { background: transparent !important; color: var(--text) !important; }
-      .table, .table th, .table td { border-color: rgba(255,255,255,0.06) !important; }
-      .table-striped tbody tr:nth-of-type(odd) { background-color: rgba(15,23,35,0.01) !important; }
-
-      /* Alerts and buttons */
-      .alert { background-color: rgba(15,23,35,0.02); color: var(--text); border-color: rgba(15,23,35,0.035); }
-      .btn, .btn-outline-primary, .btn-outline-secondary, .btn-outline-success, .btn-outline-warning { color: var(--text); border-color: rgba(15,23,35,0.06); }
-
-      /* Links and code blocks */
-      a { color: var(--accent); transition: color .16s ease; }
-      pre, code { background: rgba(15,23,35,0.02); color: var(--text); }
-
-      /* Stronger dark-mode enforcement when body has dark-mode class */
-      body.dark-mode .navbar, body.dark-mode .asura-footer, body.dark-mode footer.asura-footer { background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.006)); }
-      body.dark-mode .card, body.dark-mode .list-group-item, body.dark-mode .form-control, body.dark-mode .dropdown-menu, body.dark-mode .modal-content { background: rgba(255,255,255,0.012) !important; }
-
-      /* ensure form controls are readable */
-      .form-control, .form-select { background-color: var(--surface); color: var(--text); border: 1px solid rgba(15,23,35,0.06); }
-      .form-control::placeholder { color: rgba(15,23,35,0.48); }
-
-      /* small helpers */
-      .text-muted, .small, .faint { color: rgba(15,23,35,0.64) !important; }
-      #theme-toggle { min-width: 42px; }
-
-      /* simple entrance animations */
-      .hero {
-        animation: heroFade 900ms ease both;
+      .navbar-brand {
+        font-weight: 700;
+        font-size: 1.75rem;
+        color: #ffffff !important;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
       }
-      @keyframes heroFade {
-        from { opacity: 0; transform: translateY(-8px); }
+
+      .navbar-brand img {
+        filter: drop-shadow(0 2px 6px rgba(255, 255, 255, 0.3));
+        transition: transform 0.3s ease;
+      }
+
+      .navbar-brand:hover img {
+        transform: scale(1.1);
+      }
+
+      .navbar-brand span {
+        position: relative;
+        padding: 0.25rem 0.75rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .navbar-brand span::after {
+        content: 'Anti-Cheat System';
+        position: absolute;
+        bottom: -1.5rem;
+        left: 0;
+        font-size: 0.65rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.8);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        white-space: nowrap;
+      }
+
+      .nav-link {
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.95) !important;
+        padding: 0.5rem 1.25rem !important;
+        margin: 0 0.25rem;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .nav-link:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #ffffff !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Container */
+      .container {
+        max-width: 1280px;
+      }
+
+      /* Professional Cards for Exam Content */
+      .card {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+
+      .card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #1e3a8a, #3b82f6, #0891b2);
+        border-radius: 12px 12px 0 0;
+      }
+
+      .card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+        border-color: #3b82f6;
+      }
+
+      /* Professional Tables */
+      .table {
+        background: #ffffff;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
+      }
+
+      .table thead th {
+        background: linear-gradient(135deg, #1e3a8a, #1e40af);
+        color: #ffffff !important;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.8px;
+        padding: 1rem 1.25rem;
+        border: none;
+      }
+
+      .table tbody tr {
+        transition: all 0.2s ease;
+        border-bottom: 1px solid #f1f5f9;
+      }
+
+      .table tbody tr:hover {
+        background: #f8fafc !important;
+        transform: scale(1.005);
+      }
+
+      .table tbody td {
+        padding: 1rem 1.25rem;
+        color: #334155 !important;
+        border: none;
+        font-size: 0.95rem;
+      }
+
+      .table-striped tbody tr:nth-of-type(odd) {
+        background-color: #f8fafc !important;
+      }
+
+      /* Professional Buttons */
+      .btn {
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.625rem 1.5rem;
+        transition: all 0.3s ease;
+        border: none;
+        text-transform: uppercase;
+        font-size: 0.875rem;
+        letter-spacing: 0.5px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #1e3a8a, #1e40af);
+        color: white;
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+      }
+
+      .btn-primary:hover {
+        background: linear-gradient(135deg, #1e40af, #2563eb);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(30, 58, 138, 0.4);
+      }
+
+      .btn-success {
+        background: linear-gradient(135deg, #059669, #047857);
+        color: white;
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+      }
+
+      .btn-success:hover {
+        background: linear-gradient(135deg, #047857, #065f46);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+      }
+
+      .btn-danger {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        color: white;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+      }
+
+      .btn-danger:hover {
+        background: linear-gradient(135deg, #b91c1c, #991b1b);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+      }
+
+      .btn-warning {
+        background: linear-gradient(135deg, #d97706, #b45309);
+        color: white;
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+      }
+
+      .btn-warning:hover {
+        background: linear-gradient(135deg, #b45309, #92400e);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(217, 119, 6, 0.4);
+      }
+
+      .btn-outline-secondary {
+        border: 2px solid #cbd5e1;
+        color: #475569;
+        background: white;
+      }
+
+      .btn-outline-secondary:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #334155;
+      }
+
+      /* Professional Alerts for Exam Notifications */
+      .alert {
+        border-radius: 10px;
+        border-left: 4px solid;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        animation: slideInDown 0.4s ease;
+        background: white;
+      }
+
+      @keyframes slideInDown {
+        from { opacity: 0; transform: translateY(-15px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      .pulse {
-        animation: pulse 2.5s ease-in-out infinite;
+
+      .alert-success {
+        border-left-color: #059669;
+        background: #ecfdf5;
+        color: #065f46;
       }
-      @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.02); }
-        100% { transform: scale(1); }
+
+      .alert-danger {
+        border-left-color: #dc2626;
+        background: #fef2f2;
+        color: #991b1b;
       }
+
+      .alert-warning {
+        border-left-color: #d97706;
+        background: #fffbeb;
+        color: #92400e;
+      }
+
+      .alert-info {
+        border-left-color: #0284c7;
+        background: #f0f9ff;
+        color: #075985;
+      }
+
+      /* Form Controls for Exam Input */
+      .form-control, .form-select {
+        background: #ffffff;
+        border: 2px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+        color: #1e293b;
+        font-size: 1rem;
+      }
+
+      .form-control:focus, .form-select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        outline: none;
+      }
+
+      .form-label {
+        font-weight: 600;
+        color: #ffffff;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      label, p, span, div, small, em, strong {
+        color: #ffffff;
+      }
+
+      .text-muted {
+        color: rgba(255, 255, 255, 0.7) !important;
+      }
+      /* Professional Footer */
       footer.asura-footer {
-        margin-top: 3rem; padding: 1.5rem 0; border-top: 1px solid rgba(0,0,0,0.06);
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        border-top: 3px solid #3b82f6;
+        padding: 2rem 0;
+        margin-top: 4rem;
+        color: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
       }
-      body.dark-mode footer.asura-footer { border-top-color: rgba(255,255,255,0.04); }
 
-      /* Brand slider styles */
+      footer.asura-footer strong {
+        color: #ffffff;
+        font-size: 1.1rem;
+      }
+
+      footer.asura-footer a {
+        color: #60a5fa;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        text-decoration: none;
+      }
+
+      footer.asura-footer a:hover {
+        color: #93c5fd;
+        text-decoration: underline;
+      }
+
+      /* Info Button */
+      #brand-slider-toggle {
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+      }
+
+      #brand-slider-toggle:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: scale(1.05);
+      }
+
+      /* Badges for Exam Status */
+      .badge {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .badge.bg-danger {
+        background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+      }
+
+      .badge.bg-success {
+        background: linear-gradient(135deg, #059669, #047857) !important;
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+      }
+
+      .badge.bg-warning {
+        background: linear-gradient(135deg, #d97706, #b45309) !important;
+        box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+      }
+
+      .badge.bg-info {
+        background: linear-gradient(135deg, #0284c7, #0369a1) !important;
+        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+      }
+
+      .badge.bg-secondary {
+        background: linear-gradient(135deg, #64748b, #475569) !important;
+        box-shadow: 0 2px 8px rgba(100, 116, 139, 0.3);
+      }
+
+      /* Brand Slider */
       .brand-slider {
-        position: fixed; left: 0; right: 0; top: 0; z-index: 1050;
-        transform: translateY(-110%); transition: transform 360ms cubic-bezier(.2,.9,.2,1);
-        background: linear-gradient(90deg, rgba(0,0,0,0.8), rgba(18,18,18,0.95)); color: #fff;
-        box-shadow: 0 6px 20px rgba(0,0,0,0.25); backdrop-filter: blur(4px);
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 0;
+        z-index: 1050;
+        transform: translateY(-110%);
+        transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        background: linear-gradient(135deg, #1e3a8a, #1e40af);
+        color: white;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
       }
-      .brand-slider[aria-hidden="false"] { transform: translateY(0%); }
-      .brand-slider .brand-slider-inner { padding: 0.75rem 0; }
 
-      /* Hover & click micro-interactions */
-      a.nav-link { transition: color .16s ease, transform .12s ease; }
-      a.nav-link:hover { transform: translateY(-3px); color: #0d6efd !important; }
-      .navbar-brand { cursor: pointer; transition: transform .18s cubic-bezier(.2,.8,.2,1); }
-      .navbar-brand:active { transform: scale(.98) rotate(-1deg); }
-      .asura-footer a { transition: color .18s ease, transform .12s ease; }
-      .asura-footer a:hover { transform: translateY(-2px); color: #0d6efd; }
-      button.btn { transition: transform .12s ease, box-shadow .12s ease; }
-      button.btn:active { transform: scale(.98); }
+      .brand-slider[aria-hidden="false"] {
+        transform: translateY(0%);
+      }
 
-      /* Card hover lift */
-      .card { transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s; }
-      .card:hover { transform: translateY(-6px); box-shadow: 0 8px 30px rgba(19,24,32,0.12); }
+      /* Headings */
+      h1, h2, h3, h4, h5, h6 {
+        font-weight: 700;
+        color: #ffffff !important;
+        margin-bottom: 1.5rem;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
 
-      /* Scroll reveal */
-      .reveal { opacity: 0; transform: translateY(12px) scale(.995); transition: opacity .6s ease, transform .6s cubic-bezier(.2,.8,.2,1); }
-      .reveal.in-view { opacity: 1; transform: translateY(0) scale(1); }
+      h1 { font-size: 2.25rem; border-bottom: 3px solid #60a5fa; padding-bottom: 0.5rem; display: inline-block; }
+      h2 { font-size: 1.875rem; }
+      h3 { font-size: 1.5rem; }
 
-      /* Subtle floating/pulse for CTAs */
-      .cta-float { animation: ctaFloat 4s ease-in-out infinite; }
-      @keyframes ctaFloat { 0%{ transform: translateY(0) } 50%{ transform: translateY(-4px) } 100%{ transform: translateY(0) } }
+      /* Page Title Banner */
+      .page-header {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9));
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        border-left: 5px solid #3b82f6;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+
+      /* Security Indicator */
+      .security-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(5, 150, 105, 0.1);
+        color: #047857;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        border: 1px solid rgba(5, 150, 105, 0.3);
+      }
+
+      .security-badge::before {
+        content: '🔒';
+        font-size: 1.2rem;
+      }
+
+      /* Smooth Animations */
+      .fade-in {
+        animation: fadeIn 0.5s ease;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Loading States */
+      .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
     </style>
   </head>
   <body>
@@ -129,7 +507,6 @@
           <img src="{{ url_for('image_file', filename='asura.png') }}" alt="Asura" height="32" class="d-inline-block align-text-top me-2">
           <span>Asura</span>
         </a>
-        <button id="theme-toggle" class="btn btn-outline-secondary btn-sm me-2" aria-label="Toggle theme">🌙</button>
         <button id="brand-slider-toggle" class="btn btn-outline-secondary btn-sm me-2" aria-label="Open site menu">ℹ️</button>
         <div class="collapse navbar-collapse">
           <ul class="navbar-nav ms-auto">
@@ -204,38 +581,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-      // Theme toggle using localStorage
-      (function(){
-        const KEY = 'asura_theme';
-        const btn = document.getElementById('theme-toggle');
-        function applyTheme(theme){
-          if(theme === 'dark'){
-            document.body.classList.add('dark-mode');
-            if(btn) btn.textContent = '☀️';
-          } else {
-            document.body.classList.remove('dark-mode');
-            if(btn) btn.textContent = '🌙';
-          }
-        }
-        // initialize from localStorage
-        try{
-          const saved = localStorage.getItem(KEY) || 'light';
-          applyTheme(saved);
-        }catch(e){ applyTheme('light'); }
-        if(btn){
-          btn.addEventListener('click', function(){
-            try{
-              const cur = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
-              const next = cur === 'dark' ? 'light' : 'dark';
-              localStorage.setItem(KEY, next);
-              applyTheme(next);
-            }catch(e){ /* ignore */ }
-          });
-        }
-      })();
-        // Site-wide micro animations and interactions
+        // Site-wide interactions
         (function(){
-            // Header slider toggle (separate button) — allow brand anchor to navigate home
+            // Header slider toggle
             const sliderToggle = document.getElementById('brand-slider-toggle');
             const slider = document.getElementById('brand-slider');
             const sliderClose = document.getElementById('brand-slider-close');
@@ -249,7 +597,7 @@
             }
             if(sliderClose) sliderClose.addEventListener('click', closeSlider);
 
-          // Ripple effect for clickable items
+          // Ripple effect for buttons
           function ripple(e){
             const el = e.currentTarget;
             const rect = el.getBoundingClientRect();
@@ -262,26 +610,29 @@
             el.appendChild(ripple);
             setTimeout(()=> ripple.remove(), 600);
           }
-          document.querySelectorAll('button, .nav-link, .navbar-brand, .btn').forEach(it=>{
+          document.querySelectorAll('button, .btn').forEach(it=>{
             it.style.position = it.style.position || 'relative';
+            it.style.overflow = 'hidden';
             it.addEventListener('click', ripple);
           });
 
-          // IntersectionObserver scroll reveal
+          // Scroll animations
           const io = new IntersectionObserver((entries)=>{
             entries.forEach(entry=>{
-              if(entry.isIntersecting){ entry.target.classList.add('in-view'); }
+              if(entry.isIntersecting){ 
+                entry.target.classList.add('fade-in'); 
+              }
             });
-          }, { threshold: 0.12 });
-          document.querySelectorAll('.reveal, .hero, .card, .asura-footer').forEach(el=> io.observe(el));
+          }, { threshold: 0.1 });
+          document.querySelectorAll('.card, .table, .alert').forEach(el=> io.observe(el));
         })();
 
-        // Minimal styles for ripple elements
+        // Ripple styles
         (function(){
           const style = document.createElement('style');
           style.textContent = `
-            .ripple{ position:absolute; border-radius:50%; pointer-events:none; background: rgba(255,255,255,0.18); transform: scale(0); animation: rippleAnim .6s ease-out; }
-            @keyframes rippleAnim{ to { transform: scale(2.2); opacity: 0; } }
+            .ripple{ position:absolute; border-radius:50%; pointer-events:none; background: rgba(255,255,255,0.5); transform: scale(0); animation: rippleAnim .6s ease-out; }
+            @keyframes rippleAnim{ to { transform: scale(2.5); opacity: 0; } }
           `;
           document.head.appendChild(style);
         })();

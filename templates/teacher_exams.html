@@ -19,6 +19,9 @@
               <span class="badge bg-secondary">Not started</span>
             {% elif info.status == 'started' %}
               <span class="badge bg-success">Started</span>
+              {% if info.has_active_attempts %}
+                <span class="badge bg-danger ms-1" title="Students taking exam">🔴 Live</span>
+              {% endif %}
             {% else %}
               <span class="badge bg-primary">Finished</span>
             {% endif %}
@@ -29,6 +32,12 @@
             <a class="btn btn-sm btn-primary" href="{{ url_for('add_question', exam_id=e.id) }}">Add Question</a>
             <a class="btn btn-sm btn-secondary" href="{{ url_for('manage_questions', exam_id=e.id) }}">Manage Questions</a>
             <a class="btn btn-sm btn-info" href="{{ url_for('teacher_exam_attempts', exam_id=e.id) }}">View Attempts</a>
+            <a class="btn btn-sm btn-warning" href="{{ url_for('exam_ai_alerts', exam_id=e.id) }}">
+              🚨 AI Alerts
+              {% if info.alert_count and info.alert_count > 0 %}
+                <span class="badge bg-danger">{{ info.alert_count }}</span>
+              {% endif %}
+            </a>
             {% if info.status == 'not_started' %}
               <form method="post" action="{{ url_for('start_exam_by_teacher', exam_id=e.id) }}" style="display:inline">
                 <button class="btn btn-sm btn-success" type="submit">Start</button>

@@ -18,7 +18,14 @@
             <td>{{ a.finished_at or 'In progress' }}</td>
             <td>
               {% if e and e.results_published %}
-                {{ ('{:.2f}%'.format(a.score)) if a.score is not none else '-' }}
+                {% if a.score is not none %}
+                  {{ '{:.2f}%'.format(a.score) }}
+                  {% if row.is_terminated %}
+                    <br><span class="badge bg-danger mt-1">⚠️ TERMINATED - Cheating Detected</span>
+                  {% endif %}
+                {% else %}
+                  -
+                {% endif %}
               {% else %}
                 <em>Not published</em>
               {% endif %}

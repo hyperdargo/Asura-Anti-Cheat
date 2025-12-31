@@ -32,9 +32,27 @@
     .screenshot-overlay.active {
       opacity: 1;
     }
+    .fullscreen-exit-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.92);
+      color: #fff;
+      z-index: 10000;
+      text-align: center;
+      padding: 2rem;
+    }
   </style>
   <!-- Screenshot prevention overlay -->
   <div id="screenshotOverlay" class="screenshot-overlay"></div>
+  <div id="fullscreenExitOverlay" class="fullscreen-exit-overlay">
+    <div>
+      <h3>Fullscreen Ended</h3>
+      <p>Your attempt has been finalized because fullscreen was interrupted.</p>
+    </div>
+  </div>
   <h2>{{ exam.title }}</h2>
   <p>{{ exam.description }}</p>
   <div id="timer" class="mb-3 alert alert-info"></div>
@@ -74,6 +92,15 @@
     const deadlineMs = {{ deadline_ts if deadline_ts is not none else 'null' }};
     const startedAtMs = {{ started_at_ms if started_at_ms is not none else 'null' }};
     const lecturerStartedMs = {{ lecturer_started_ms if lecturer_started_ms is not none else 'null' }};
+    const forceFinishUrl = '{{ url_for('force_finish', attempt_id=attempt.id) }}';
+    const redirectUrl = '{{ url_for('student_exams') }}';
+    const attemptFinishedKey = 'attempt_{{ attempt.id }}_fullscreen_finished';
+    if(localStorage.getItem(attemptFinishedKey) === '1'){
+      window.location.replace(redirectUrl);
+    }
+    let hadFullscreen = false;
+    let fullscreenExitHandled = false;
+    let suppressBeforeUnload = false;
 
     function formatTime(ms){
       const total = Math.max(0, Math.floor(ms/1000));
@@ -149,16 +176,68 @@
       return Promise.reject(new Error('Fullscreen not supported'));
     }
 
-    let hadFullscreen = false;
+    function showScreenshotOverlay(){
+      const overlay = document.getElementById('screenshotOverlay');
+      overlay.classList.add('active');
+      overlay.style.display = 'block';
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          overlay.style.display = 'none';
+        }, 200);
+      }, 800);
+    }
+
+    async function handleFullscreenExit(reason){
+      if(fullscreenExitHandled){ return; }
+      fullscreenExitHandled = true;
+      suppressBeforeUnload = true;
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
+      localStorage.setItem(attemptFinishedKey, '1');
+      reportEvent('exam_portal_fullscreen_exit', {reason});
+      const blocker = document.getElementById('fullscreenExitOverlay');
+      if(blocker){ blocker.style.display = 'flex'; }
+      const form = document.getElementById('exam-form');
+      if(form){
+        form.querySelectorAll('input, button, textarea, select').forEach(el => { el.disabled = true; });
+      }
+      try{
+        await sendForceFinish();
+      }catch(err){
+        console.warn('force finish failed', err);
+      }
+      setTimeout(() => { window.location.replace(redirectUrl); }, 800);
+    }
+    function sendForceFinish(){
+      if(navigator.sendBeacon){
+        const ok = navigator.sendBeacon(forceFinishUrl, new Blob([], {type:'text/plain'}));
+        if(ok){ return Promise.resolve(); }
+      }
+      return fetch(forceFinishUrl, {
+        method: 'POST',
+        credentials: 'include',
+        keepalive: true
+      }).catch(() => {});
+    }
+    function beforeUnloadHandler(e){
+      if(suppressBeforeUnload){ return; }
+      reportEvent('window_unload_attempt', {});
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+
+    // document.addEventListener('fullscreenchange', ...) uses the original hadFullscreen variable
     document.addEventListener('fullscreenchange', function(){
       const isFs = !!document.fullscreenElement;
-      if(hadFullscreen && !isFs){
-        // user exited fullscreen after starting -> immediate finish
-        reportEvent('fullscreen_exit', {});
-        fetch('{{ url_for('force_finish', attempt_id=attempt.id) }}', {method: 'POST'}).catch(()=>{});
-        setTimeout(()=>{ window.location.href = '{{ url_for('student_exams') }}'; }, 1000);
+      if(isFs){
+        hadFullscreen = true;
+      }else if(hadFullscreen){
+        handleFullscreenExit('fullscreenchange');
       }
-      hadFullscreen = isFs;
+    });
+    document.addEventListener('fullscreenerror', function(){
+      handleFullscreenExit('fullscreenerror');
     });
 
     // Detect visibility changes and window blur/focus
@@ -212,6 +291,7 @@
         (code === 123) ||                                 // F12
         (combo.ctrl && combo.shift && code === 73) ||     // Ctrl+Shift+I
         (combo.ctrl && combo.shift && code === 67) ||     // Ctrl+Shift+C
+        (code === 122) ||                                 // F11
         (key === 'printscreen' || code === 44) ||         // PrintScreen
         (combo.ctrl && key === 's') ||                    // Ctrl+S
         (combo.ctrl && key === 'p');                      // Ctrl+P
@@ -227,19 +307,6 @@
 
     window.addEventListener('keydown', blockRestrictedKeys, true);
     document.addEventListener('keydown', blockRestrictedKeys, true);
-
-    // Function to show screenshot overlay
-    function showScreenshotOverlay(){
-      const overlay = document.getElementById('screenshotOverlay');
-      overlay.classList.add('active');
-      overlay.style.display = 'block';
-      setTimeout(() => {
-        overlay.classList.remove('active');
-        setTimeout(() => {
-          overlay.style.display = 'none';
-        }, 200);
-      }, 800);
-    }
 
     // Enhanced screenshot detection with multiple methods
     (function detectScreenCapture(){
@@ -272,19 +339,16 @@
     })();
 
     // Prevent window from being minimized or closed
-    window.addEventListener('beforeunload', function(e){
-      reportEvent('window_unload_attempt', {});
-      e.preventDefault();
-      e.returnValue = '';
-      return false;
-    });
-
+    window.addEventListener('beforeunload', beforeUnloadHandler);
     // Block fullscreen exit by preventing Escape key
     document.addEventListener('keydown', function(e){
       if(e.keyCode === 27 && document.fullscreenElement){
         e.preventDefault();
         reportEvent('fullscreen_escape_attempt', {});
         return false;
+      }
+      if(e.keyCode === 27 && !document.fullscreenElement && hadFullscreen){
+        handleFullscreenExit('escape_key');
       }
     }, true);
 
@@ -329,5 +393,54 @@
     }
 
     // Removed auto-begin in popup to ensure user gesture for fullscreen
+
+    // ===== REAL-TIME EXAM TERMINATION LISTENER =====
+    // Connect to Socket.IO for real-time termination detection
+    const socket = io();
+    const attemptId = {{ attempt.id }};
+    
+    // Join the attempt room to receive termination events
+    socket.on('connect', function() {
+      console.log('Connected to exam monitoring');
+      socket.emit('join_attempt', { attempt_id: attemptId });
+    });
+
+    // Listen for exam termination event from staff/teacher
+    socket.on('exam_terminated', function(data) {
+      if (data.attempt_id === attemptId) {
+        // Exam has been terminated by staff/teacher
+        alert('⚠️ YOUR EXAM HAS BEEN TERMINATED\n\n' + data.message + '\n\nYour current answers have been saved and the exam will now close.');
+        
+        // Try to submit current state before closing
+        fetch('{{ url_for("save_attempt", attempt_id=attempt.id) }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: getCurrentAnswers() })
+        }).finally(function() {
+          // Force finish the exam
+          fetch('{{ url_for("force_finish", attempt_id=attempt.id) }}', {
+            method: 'POST'
+          }).finally(function() {
+            // Redirect to student exams page
+            window.location.href = '{{ url_for("student_exams") }}';
+          });
+        });
+      }
+    });
+
+    // Helper function to get current answers
+    function getCurrentAnswers() {
+      const answers = {};
+      document.querySelectorAll('input[type="radio"]:checked').forEach(function(input) {
+        const qId = input.name.replace('question_', '');
+        answers[qId] = parseInt(input.value);
+      });
+      return answers;
+    }
+
+    // Handle disconnection
+    socket.on('disconnect', function() {
+      console.log('Disconnected from exam monitoring');
+    });
   </script>
 {% endblock %}

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Alerts - Secure Exam System</title>
+    <link rel="stylesheet" href="styles/alerts.css">
+</head>
+<body>
+    <div class="alerts-container">
+        <div class="alerts-header">
+            <h2>🚨 Exam Cheating Alerts</h2>
+            <div class="alerts-filters">
+                <select id="severityFilter">
+                    <option value="all">All Severities</option>
+                    <option value="CRITICAL">Critical</option>
+                    <option value="HIGH">High</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="LOW">Low</option>
+                </select>
+                <select id="statusFilter">
+                    <option value="all">All Status</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="INVESTIGATING">Investigating</option>
+                    <option value="RESOLVED">Resolved</option>
+                    <option value="FALSE_POSITIVE">False Positive</option>
+                </select>
+                <button onclick="refreshAlerts()" class="refresh-btn">🔄 Refresh</button>
+            </div>
+        </div>
+
+        <div class="alerts-stats">
+            <div class="stat-card critical">
+                <span class="stat-number" id="criticalCount">0</span>
+                <span class="stat-label">Critical</span>
+            </div>
+            <div class="stat-card high">
+                <span class="stat-number" id="highCount">0</span>
+                <span class="stat-label">High</span>
+            </div>
+            <div class="stat-card pending">
+                <span class="stat-number" id="pendingCount">0</span>
+                <span class="stat-label">Pending</span>
+            </div>
+            <div class="stat-card total">
+                <span class="stat-number" id="totalCount">0</span>
+                <span class="stat-label">Total Alerts</span>
+            </div>
+        </div>
+
+        <div id="alertsList" class="alerts-list">
+            <div class="alerts-loading">Loading alerts...</div>
+        </div>
+    </div>
+
+    <!-- Alert Detail Modal -->
+    <div id="alertModal" class="alert-modal" style="display: none;">
+        <div class="alert-modal-content">
+            <div class="modal-header">
+                <h2>Alert Details</h2>
+                <button onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Details will be populated dynamically -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn-investigating" onclick="updateStatus('INVESTIGATING')">
+                    Mark Investigating
+                </button>
+                <button class="btn-resolved" onclick="updateStatus('RESOLVED')">
+                    Mark Resolved
+                </button>
+                <button class="btn-false" onclick="updateStatus('FALSE_POSITIVE')">
+                    False Positive
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/alerts.js"></script>
+</body>
+</html>

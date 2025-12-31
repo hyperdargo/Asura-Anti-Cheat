@@ -7,6 +7,9 @@
     {% if current_user.role in ['lecturer','staff','admin'] %}
       <a class="btn btn-sm btn-outline-warning" href="{{ url_for('live_attempt_events', attempt_id=attempt.id) }}">Live Monitor</a>
     {% endif %}
+    {% if attempt.has_suspicious_activity %}
+      <span class="badge bg-danger ms-2">⚠️ Suspicious Activity Detected</span>
+    {% endif %}
   </p>
   <p>Started: {{ attempt.started_at }} | Finished: {{ attempt.finished_at or 'In progress' }} | Score: {{ attempt.score if attempt.score is not none else '-' }}</p>
 

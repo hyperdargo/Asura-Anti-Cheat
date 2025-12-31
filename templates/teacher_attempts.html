@@ -2,9 +2,12 @@
 {% block title %}Exam Attempts{% endblock %}
 {% block content %}
   <h2>Attempts for: {{ exam.title }}</h2>
-  <p><a class="btn btn-secondary" href="{{ url_for('teacher_exams') }}">Back to Exams</a></p>
+  <p>
+    <a class="btn btn-secondary" href="{{ url_for('teacher_exams') }}">Back to Exams</a>
+    <a class="btn btn-warning" href="{{ url_for('exam_ai_alerts', exam_id=exam.id) }}">🚨 View AI Alerts</a>
+  </p>
   <table class="table">
-    <thead><tr><th>Student</th><th>Started</th><th>Finished</th><th>Score</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Student</th><th>Started</th><th>Finished</th><th>Score</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>
       {% for a in attempts %}
         <tr>
@@ -12,6 +15,16 @@
           <td>{{ a.started_at }}</td>
           <td>{{ a.finished_at or 'In progress' }}</td>
           <td>{{ a.score if a.score is not none else '-' }}</td>
+          <td>
+            {% if a.finished_at %}
+              <span class="badge bg-success">Completed</span>
+            {% else %}
+              <span class="badge bg-primary">🔴 In Progress</span>
+            {% endif %}
+            {% if a.has_alerts %}
+              <span class="badge bg-danger" title="Suspicious activity detected">⚠️ Alert</span>
+            {% endif %}
+          </td>
           <td><a class="btn btn-sm btn-primary" href="{{ url_for('view_attempt', attempt_id=a.id) }}">View</a></td>
         </tr>
       {% endfor %}
