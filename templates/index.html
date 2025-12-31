@@ -1,13 +1,22 @@
 {% extends 'base.html' %}
 {% block title %}Home - Asura{% endblock %}
 {% block content %}
-  <section class="hero p-5 rounded mb-4 text-center bg-light">
+  <section class="hero p-5 rounded mb-4 text-center" style="background: linear-gradient(135deg, rgba(30, 58, 138, 0.9), rgba(59, 130, 246, 0.9)); backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
     <div class="container">
-      <h1 class="display-5 fw-bold">Welcome to Asura</h1>
-      <p class="lead mb-4">Secure online examinations with client-side anti-cheat monitoring and live staff oversight.</p>
+      <h1 class="display-5 fw-bold" style="color: #ffffff !important;">Welcome to Asura</h1>
+      <p class="lead mb-4" style="color: #e2e8f0 !important;">Secure online examinations with client-side anti-cheat monitoring and live staff oversight.</p>
       <div class="d-flex justify-content-center gap-3">
-        <a class="btn btn-primary btn-lg pulse" href="{{ url_for('student_exams') if current_user.role=='student' else url_for('teacher_exams') }}">Get Started</a>
-        <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('student_results') if current_user.role=='student' else url_for('teacher_exams') }}">Dashboard</a>
+        {% if current_user.role == 'admin' %}
+          <a class="btn btn-primary btn-lg pulse" href="{{ url_for('admin_dashboard') }}">Admin Page</a>
+        {% elif current_user.role == 'lecturer' %}
+          <a class="btn btn-primary btn-lg pulse" href="{{ url_for('teacher_exams') }}">Exams</a>
+        {% elif current_user.role == 'staff' %}
+          <a class="btn btn-primary btn-lg pulse" href="{{ url_for('teacher_exams') }}">Exams</a>
+          <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('staff_live_attempts') }}">Live Attempts</a>
+        {% elif current_user.role == 'student' %}
+          <a class="btn btn-primary btn-lg pulse" href="{{ url_for('student_exams') }}">Exam Portal</a>
+          <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('student_results') }}">Results</a>
+        {% endif %}
       </div>
     </div>
   </section>
