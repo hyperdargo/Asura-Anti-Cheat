@@ -225,6 +225,10 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # If user is already logged in, redirect to index
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
